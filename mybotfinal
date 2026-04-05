@@ -1,0 +1,118 @@
+from controller import Robot
+import numpy as np
+import cv2
+
+timeStep = 32
+max_velocity = 6.28
+startTime = 0
+duration = 0
+
+
+robot = Robot()
+
+
+
+
+# Define the wheels 
+wheel1 = robot.getDevice("wheel1 motor")    
+wheel2 = robot.getDevice("wheel2 motor") 
+
+wheel1.setPosition(float("inf"))       
+wheel2.setPosition(float("inf"))
+
+# Define distance sensors
+s1 = robot.getDevice("distsens1")
+s2 = robot.getDevice("distsens2")
+s3 = robot.getDevice("distsens4")
+s4 = robot.getDevice("distsens3")
+
+
+s1.enable(timeStep)
+s2.enable(timeStep)
+s3.enable(timeStep)
+s4.enable(timeStep)
+
+
+colour_sensor = robot.getDevice('colour_sensor')
+colour_sensor.enable(timeStep)
+
+gps = robot.getDevice('gps')
+gps.enable(timeStep)
+
+camera = robot.getDevice("camera1")
+camera.enable(timeStep)
+
+
+
+start = robot.getTime()
+
+cv2.namedWindow('frame2', cv2.WINDOW_NORMAL)
+a = [[0] * 200 for i in range(200)]
+mapping_img = np.zeros_like(a)
+mapping_img = np.uint8(mapping_img)
+for i in range(20):
+    cv2.line(mapping_img, (i*10, 0), (i*10, 200), (146, 154, 161), 1)
+    cv2.line(mapping_img, (0, i*10), (200, i*10), (146, 154, 161), 1)
+
+lst = []
+    
+while robot.step(timeStep) != -1:
+
+    x = int(gps.getValues()[0]*100)-100
+    y = int(gps.getValues()[1]*100)
+    z = int(gps.getValues()[2]*100)-100     
+    mapping_img[z][x] = np.uint8(255)
+    #print("x: " + str(x) + " y: " + str(y) + " z: " + str(z))
+    
+    cv2.imshow("frame2", mapping_img)
+    cv2.waitKey(1)
+
+    speed1 = 6
+    speed2 = 6
+
+
+    if s1.getValue() < 0.1 or s2.getValue() < 0.04:
+        speed1 = -6
+        speed2 = 6   
+    elif s1.getValue() < 0.1:
+        speed1 = -6
+        speed2 = 6
+    if s1.getValue() > 0.15 and s2.getValue() > 0.15 and s3.getValue() > 0.11 or s6.getValue() < 0.02:
+        speed2 = -6
+        speed1 = 6
+
+    
+    if (robot.getTime() - startTime) < duration:
+        pass
+    else:
+        startTime = 0
+        duration = 0
+
+        colour = colour_sensor.getImage()
+        img = np.array(np.frombuffer(colour, np.uint8).reshape((colour_sensor.getHeight(), colour_sensor.getWidth(), 4)))
+        img[:,:,2] = np.zeros([img.shape[0], img.shape[1]])
+        hsv = cv2.cvtColor(img, cv2.COLOR_RGB2HSV)[0][0]
+        print(str(hsv))#s2.getValue(), s3.getValue())
+        #print(gps.getValues())
+    if str(hsv) in ['[ 30 255  54]']: #'[ 30 255  45]', '[ 30 255  50]', '[ 30 255  51]', '[ 30 255  52]', '[ 30 255  53]', '[ 30 255  55]', '[ 30 255  56]', '[ 30 255  57]', '[ 30 255  58]', '[ 30 255  59]',]:
+        speed1 = -6
+        speed2 = 6
+    if str(hsv) in ['[ 30 255  45]', '[ 30 255  46]', '[ 30 255  47]', '[ 30 255  10]']:
+        speed1 = 0
+        speed2 = 0
+
+    lst1 = []
+    lst.append([str(x), str(y), str(z)])
+    if len(lst) > 100:
+        del lst[0]
+    for i in range(len(lst)):
+        if lst[i] not in lst1:
+            lst1.append(lst[i])
+    if len(lst1) == 1 and len(lst) == 100:
+        speed2 = -6
+        speed1 = 0
+    
+    
+    wheel1.setVelocity(speed1)              
+    wheel2.setVelocity(speed2)
+    
